@@ -1,0 +1,36 @@
+name: Kimi SwingPro Scanner
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 4 * * 1-6'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scanner
+        run: python nse_sector_swing_scanner.py --top-n 25 --min-score 3
+        env:
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_TO: lvsp51975@gmail.com
+
+      - name: Upload Excel artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KIMI_SWING_PRO_Report
+          path: |
+            **/*.xlsx
+            **/*.csv
+          retention-days: 7
