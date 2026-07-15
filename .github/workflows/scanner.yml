@@ -24,13 +24,12 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_TO: lvsp51975@gmail.com
+          EXCEL_DIR: /tmp/kimi_output
 
       - name: Upload Excel artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: KIMI_SWING_PRO_Report
-          path: |
-            **/*.xlsx
-            **/*.csv
+          path: /tmp/kimi_output/
           retention-days: 7
