@@ -45,12 +45,6 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import warnings
 warnings.filterwarnings('ignore')
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-
 
 # =============================================================================
 # CONFIGURATION
@@ -1137,7 +1131,6 @@ class NSESectorSwingScanner:
             print(f"   Sheets: Scan_Info | Sector_Analysis | All_Swing_Trades")
             print(f"           BULLISH_Signals | BEARISH_Signals | TOP_PICKS")
             print(f"{'='*70}")
-            send_email_with_attachment(filepath)
 
         except ImportError:
             print("\n[ERROR] openpyxl not installed. Installing...")
@@ -1149,53 +1142,6 @@ class NSESectorSwingScanner:
             csv_path = os.path.join(output_dir, f'KIMI_SWING_PRO_{timestamp}.csv')
             swing_df.to_csv(csv_path, index=False)
             print(f"[FALLBACK] Saved as CSV: {csv_path}")
-
-
-
-# =============================================================================
-# EMAIL SENDER
-# =============================================================================
-
-def send_email_with_attachment(filepath):
-    """Send Excel file to configured email. Uses env vars or defaults."""
-    EMAIL_FROM     = os.getenv('EMAIL_FROM', '')
-    EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD', '')
-    EMAIL_TO       = os.getenv('EMAIL_TO', 'lvsp51975@gmail.com')
-
-    if not EMAIL_FROM or not EMAIL_PASSWORD:
-        print("[EMAIL] EMAIL_FROM / EMAIL_PASSWORD not set in env — skipping email.")
-        return
-
-    try:
-        today = datetime.now().strftime('%d %b %Y %H:%M')
-        msg = MIMEMultipart()
-        msg['From']    = EMAIL_FROM
-        msg['To']      = EMAIL_TO
-        msg['Subject'] = f'KIMI_SWING_PRO Scan Report - {today}'
-
-        body = f"""KIMI_SWING_PRO - NSE Sector & Swing Trade Scanner
-Date   : {today}
-File   : {os.path.basename(filepath)}
-Sheets : Scan_Info | Sector_Analysis | All_Swing_Trades | BULLISH_Signals | BEARISH_Signals | TOP_PICKS
-
-Please find the Excel scan report attached.
-"""
-        msg.attach(MIMEText(body, 'plain'))
-
-        with open(filepath, 'rb') as f:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(f.read())
-        encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(filepath)}"')
-        msg.attach(part)
-
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(EMAIL_FROM, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
-
-        print(f"[EMAIL] Sent to {EMAIL_TO} OK")
-    except Exception as e:
-        print(f"[EMAIL] Failed: {e}")
 
 
 # =============================================================================
