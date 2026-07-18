@@ -152,6 +152,7 @@ class ScanXScraper:
 
     def __init__(self, url=SCANX_URL):
         self.url = url
+        self.used_fallback = False
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -168,6 +169,7 @@ class ScanXScraper:
             return self._parse_table(soup)
         except Exception as e:
             print(f"[ERROR] Failed to fetch scanx data: {e}")
+            self.used_fallback = True
             return self._fallback_data()
 
     def _parse_table(self, soup):
@@ -227,7 +229,7 @@ class ScanXScraper:
                 pass
 
         if not stocks:
-            print("[WARN] Could not parse table, using fallback data.")
+            self.used_fallback = True
             return self._fallback_data()
 
         print(f"[SCANX] Parsed {len(stocks)} stocks from scanx.trade")
@@ -441,6 +443,10 @@ class TechnicalAnalyzer:
         minus_dm = -low.diff()
         plus_dm[plus_dm < 0] = 0
         minus_dm[minus_dm < 0] = 0
+        # Wilder rule: only larger of +DM/-DM counts per bar, other goes to 0
+        mask_plus_wins = plus_dm > minus_dm
+        minus_dm[mask_plus_wins] = 0
+        plus_dm[~mask_plus_wins] = 0
 
         tr = pd.concat([high - low, abs(high - close.shift()), abs(low - close.shift())], axis=1).max(axis=1)
         atr = tr.rolling(window=period).mean()
@@ -809,6 +815,13 @@ class NSESectorSwingScanner:
         else:
             scanx_df = self.scraper.fetch()
 
+        if self.scraper.used_fallback:
+            print("\n" + "!" * 90)
+            print("!!  WARNING: LIVE SCRAPE FAILED — USING HARDCODED FALLBACK DATA")
+            print("!!  Prices/delivery% below are FROZEN SNAPSHOT (script build date), NOT live.")
+            print("!!  Do NOT trade off these numbers. Fix scraper or re-run when scanx.trade reachable.")
+            print("!" * 90 + "\n")
+
         print(f"\n[SCANX] Loaded {len(scanx_df)} stocks with delivery data")
 
         # Step 2: Sector Analysis (2-week performance)
@@ -1071,7 +1084,7 @@ class NSESectorSwingScanner:
         meta_data = {
             'Field': [
                 'Scanner_Name', 'Version', 'Scan_Date', 'Scan_Time', 
-                'Data_Source', 'Total_Stocks_Analyzed', 'Sectors_Covered',
+                'Data_Source', 'DELIVERY_DATA_STATUS', 'Total_Stocks_Analyzed', 'Sectors_Covered',
                 'Bullish_Signals', 'Bearish_Signals', 'Neutral_Signals',
                 'Best_Sector', 'Min_Score_Threshold', 'Top_N_Limit'
             ],
@@ -1081,6 +1094,7 @@ class NSESectorSwingScanner:
                 current_date,
                 current_time,
                 'scanx.trade + Yahoo Finance',
+                'STALE FALLBACK DATA - DO NOT TRUST DELIVERY%' if self.scraper.used_fallback else 'LIVE (scraped this run)',
                 len(swing_results),
                 len(sector_results),
                 len(bullish),
